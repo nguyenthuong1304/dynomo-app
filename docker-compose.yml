@@ -1,0 +1,64 @@
+version: '3'
+services:
+  webserver:
+    container_name: webserver
+    image: nginx:alpine
+    restart: unless-stopped
+    tty: true
+    working_dir: /var/www/html
+    ports:
+      - "82:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html
+      - ./.docker/nginx/config/conf.d:/etc/nginx/conf.d/
+    networks:
+      - dynomo_network
+    depends_on:
+        - app
+        - mysql
+
+  app:
+    container_name: dynomo
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "9000:9000"
+    networks:
+      - dynomo_network
+
+  mysql:
+    container_name: mysql
+    image: mysql:5.7
+    restart: always
+    command: --explicit_defaults_for_timestamp
+    volumes:
+      - ./.docker/mysql/data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: dynomo
+      MYSQL_USER: laravel
+      MYSQL_ROOT_PASSWORD: laravel
+      MYSQL_PASSWORD: laravel
+    networks:
+      - dynomo_network
+
+  redis:
+    container_name: guild-redis
+    build: ./.docker/redis
+    volumes:
+      - ./.docker/redis/data:/data
+    ports:
+      - "63799:6379"
+    networks:
+      - dynomo_network
+
+networks:
+  dynomo_network:
+    driver: bridge
