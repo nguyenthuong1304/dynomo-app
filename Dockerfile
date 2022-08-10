@@ -2,6 +2,14 @@ FROM php:8.1.0-fpm
 
 ENV TERM xterm
 
+ARG APP_CODE_PATH="/var/www/html"
+COPY .  ${APP_CODE_PATH}
+
+WORKDIR ${APP_CODE_PATH}
+
+COPY ./.docker/.shared/scripts/ /tmp/scripts/
+RUN chmod +x -R /tmp/scripts/
+
 RUN apt-get update && apt-get install -y\
     libpq-dev \
     libmemcached-dev \
@@ -25,6 +33,8 @@ RUN apt-get update && apt-get install -y\
     fonts-takao-mincho \
     && rm -r /var/lib/apt/lists/*
 
+RUN /tmp/scripts/install_software.sh
+
 # Install extensions
 RUN docker-php-ext-install exif pcntl
 RUN docker-php-ext-configure gd \
@@ -33,7 +43,6 @@ RUN docker-php-ext-configure gd \
 	--with-freetype \
 	&& docker-php-ext-install -j$(nproc) gd
 
-# configure intl for php - package for unicode and international language - go with libicu
 RUN docker-php-ext-configure intl
 
 # Install mongodb, xdebug
@@ -45,7 +54,6 @@ RUN pecl install mongodb \
 RUN pecl install mcrypt-1.0.5 \
     && docker-php-ext-enable mcrypt
 
-# Install extensions using the helper script provided by the base image for php
 RUN docker-php-ext-configure zip \
     && docker-php-ext-install \
     bcmath \
@@ -60,22 +68,30 @@ ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS="0" \
     PHP_OPCACHE_MEMORY_CONSUMPTION="192" \
     PHP_OPCACHE_MAX_WASTED_PERCENTAGE="10"
 
+RUN curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" \
+    && python3 get-pip.py \
+    && pip3 install supervisor \
+    && echo "supervisord -c /etc/supervisord.conf" >> /root/.bashrc
+
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 RUN docker-php-ext-install opcache
 
-RUN wget https://github.com/h4cc/wkhtmltopdf-amd64/blob/master/bin/wkhtmltopdf-amd64?raw=true -O /usr/local/bin/wkhtmltopdf
+# RUN wget https://github.com/h4cc/wkhtmltopdf-amd64/blob/master/bin/wkhtmltopdf-amd64?raw=true -O /usr/local/bin/wkhtmltopdf
 
 RUN groupadd -g 1000 www
 RUN useradd -u 1000 -ms /bin/bash -g www www
-
-WORKDIR /var/www/html
 
 ADD ./.docker/php-fpm/config/conf.ini /usr/local/etc/php/conf.d
 ADD ./.docker/php-fpm/config/opcache.ini /usr/local/etc/php/conf.d
 ADD ./.docker/php-fpm/config/php-fpm.conf /usr/local/etc/php-fpm.d/
 
-RUN sed -i 's/^CipherString/#&/' /etc/ssl/openssl.cnf
-RUN chmod +x /usr/local/bin/wkhtmltopdf
+COPY .docker/supervisor/supervisord.conf /etc/supervisord.conf
+COPY .docker/supervisor/laravel-horizon.conf /etc/supervisor/conf.d/laravel-horizon.conf
+
+# RUN sed -i 's/^CipherString/#&/' /etc/ssl/openssl.cnf
+# RUN chmod +x /usr/local/bin/wkhtmltopdf
 
 EXPOSE 9000
 
-CMD [ "php-fpm" ]
+CMD ["php-fpm"]

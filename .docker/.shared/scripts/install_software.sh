@@ -1,7 +1,6 @@
 #!/bin/sh
 
 apt-get update -yqq && apt-get install -yqq \
-curl \
 dnsutils \
 gdb \
 git \
@@ -14,7 +13,6 @@ strace \
 sudo \
 sysstat \
 unzip \
-vim \
 wget \
 net-tools \
 supervisor \

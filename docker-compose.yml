@@ -1,4 +1,4 @@
-version: '3'
+version: '2'
 services:
   webserver:
     container_name: webserver
@@ -21,12 +21,13 @@ services:
   app:
     container_name: dynomo
     build:
+      args:
+        user: thuong
+        uid: 1000
       context: .
       dockerfile: ./Dockerfile
     restart: unless-stopped
     tty: true
-    volumes:
-      - ./:/var/www/html
     ports:
       - "9000:9000"
     networks:
@@ -58,6 +59,17 @@ services:
       - "63799:6379"
     networks:
       - dynomo_network
+
+  mailhog:
+    container_name: mailhog
+    build: ./.docker/mailhog
+    restart: always
+    command: ["-storage=maildir", "-maildir-path=/maildir"]
+    volumes:
+      - ./.docker/mailhog/maildir:/maildir
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
 networks:
   dynomo_network:
